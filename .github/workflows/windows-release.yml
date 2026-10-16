@@ -1,0 +1,30 @@
+name: Publish modified Windows installer
+
+on:
+  push:
+    branches: [codex/windows-package]
+    paths:
+      - .github/workflows/windows-release.yml
+      - .github/scripts/publish-windows-package.py
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: windows-release-b2452458
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'chiyugui001/webcodex' && github.ref == 'refs/heads/codex/windows-package'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify retained installer and publish Windows prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/publish-windows-package.py
