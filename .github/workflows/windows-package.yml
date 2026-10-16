@@ -1,0 +1,112 @@
+name: Windows desktop package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/windows-package]
+    paths: [.github/workflows/windows-package.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 2
+      SOURCE_SHA: b2452458745daec7b6d870d30d13803c71b6988f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b2452458745daec7b6d870d30d13803c71b6988f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-desktop-package
+          workspaces: |
+            . -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Validate source and build bundled runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ((git rev-parse HEAD).Trim() -ne $env:SOURCE_SHA) { throw "Unexpected source commit" }
+          if ((git status --porcelain | Out-String).Trim()) { throw "Source checkout must be clean" }
+          $version = (node -p "require('./npm/webcodex/package.json').version").Trim()
+          if ($LASTEXITCODE -ne 0) { throw "Cannot read package version" }
+          $builtAt = [Int64]((git show -s --format=%ct HEAD).Trim())
+          $env:WEBCODEX_BUILT_AT = "$builtAt"
+          cargo build --locked --profile dogfood -p webcodex -p webcodex-cli -p webcodex-runner
+          if ($LASTEXITCODE -ne 0) { throw "Native Windows runtime build failed" }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "WEBCODEX_BUILT_AT=$builtAt" >> $env:GITHUB_ENV
+      - name: Install and validate Desktop frontend
+        shell: pwsh
+        run: |
+          npm ci --prefix apps/desktop
+          if ($LASTEXITCODE -ne 0) { throw "Desktop dependency installation failed" }
+          npm --prefix apps/desktop run typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Desktop type check failed" }
+          npm --prefix apps/desktop test
+          if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
+      - name: Stage exact runtime resources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = Join-Path $env:RUNNER_TEMP "webcodex-desktop-package-stage"
+          & .\scripts\prepare_desktop_bundle.ps1 `
+            -BinDir "target\dogfood" `
+            -Version $env:VERSION `
+            -SourceSha $env:SOURCE_SHA `
+            -BuiltAt ([Int64]$env:WEBCODEX_BUILT_AT) `
+            -OutputDir $stage
+          "DESKTOP_TAURI_CONFIG=$(Join-Path $stage 'tauri.bundle.conf.json')" >> $env:GITHUB_ENV
+          "DESKTOP_TAURI_TARGET=$(Join-Path $env:GITHUB_WORKSPACE 'target\desktop-package-tauri')" >> $env:GITHUB_ENV
+      - name: Build Windows x64 installer
+        working-directory: apps/desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:CARGO_TARGET_DIR = $env:DESKTOP_TAURI_TARGET
+          node node_modules/@tauri-apps/cli/tauri.js build --bundles nsis --config $env:DESKTOP_TAURI_CONFIG --ci --no-sign -- --locked
+          if ($LASTEXITCODE -ne 0) { throw "Desktop installer build failed" }
+          $bundleDir = Join-Path $env:CARGO_TARGET_DIR "release\bundle\nsis"
+          $built = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
+          if ($built.Count -ne 1) { throw "Expected exactly one new installer" }
+          $dist = Join-Path $env:RUNNER_TEMP "windows-package"
+          New-Item -ItemType Directory -Path $dist -ErrorAction Stop | Out-Null
+          $filename = "webcodex-desktop-local-$($env:SOURCE_SHA.Substring(0, 12))-v$env:VERSION-win32-x64-setup.exe"
+          $installer = Join-Path $dist $filename
+          Copy-Item -LiteralPath $built[0].FullName -Destination $installer
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText("$installer.sha256", "$hash  $filename`n", [System.Text.Encoding]::ASCII)
+          "DESKTOP_INSTALLER=$installer" >> $env:GITHUB_ENV
+      - name: Validate installer on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & .\scripts\desktop_install_windows_smoke.ps1 `
+            -Installer $env:DESKTOP_INSTALLER `
+            -Version $env:VERSION `
+            -SourceSha $env:SOURCE_SHA `
+            -BuiltAt ([Int64]$env:WEBCODEX_BUILT_AT) `
+            -Platform win32-x64
+      - name: Upload installable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: webcodex-windows-x64-b2452458745d
+          path: ${{ runner.temp }}/windows-package/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
