@@ -66,11 +66,29 @@
 .workspace-dialog p { font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .workspace-dialog h3 { font-size: 14px; }
 .session-detail-meta { display: flex; gap: 12px; align-items: center; font-size: 12px; color: #747b85; }
-.workspace-timeline > article { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid #e0e3e5; padding: 12px 0; font-size: 12px; }
-.workspace-timeline > article > div { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.workspace-timeline > .activity-record { border-bottom: 1px solid #e0e3e5; }
+.workspace-timeline-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding: 12px 0; font-size: 12px; }
+.workspace-timeline-row > .activity-summary-main { flex-basis: 200px; }
 .workspace-timeline strong { font-weight: 550; overflow-wrap: anywhere; }
-.workspace-timeline > article > div > span { color: #787f88; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-timeline-row > .activity-summary-main > span { color: #787f88; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-timeline time, .activity-outcome { font-size: 11px; color: #747b85; flex-shrink: 0; }
+.activity-record { min-width: 0; }
+.activity-record > summary { cursor: pointer; list-style: none; }
+.activity-record > summary::-webkit-details-marker { display: none; }
+.activity-record > summary:hover { background: #eeefed; }
+.activity-record > summary:focus-visible { outline: 2px solid #3866b5; outline-offset: 2px; }
+.activity-summary-main { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.activity-row > .activity-summary-main { text-transform: none; }
+.activity-summary-main strong { overflow-wrap: anywhere; }
+.activity-record-toggle { margin-left: auto; flex-shrink: 0; font-size: 11px; color: #626d76; }
+.activity-record-toggle > span { display: inline-block; }
+.activity-record[open] > summary .activity-record-toggle > span { transform: rotate(90deg); }
+.activity-record-content { padding: 0 12px 12px; }
+.activity-record-content dl { display: grid; gap: 12px; margin: 0; }
+.activity-record-content dl > div { display: grid; grid-template-columns: minmax(0, 145px) minmax(0, 1fr); gap: 12px; padding-top: 8px; border-top: 1px solid #e0e3e5; }
+.activity-record-content dt { font-size: 12px; color: #626d76; overflow-wrap: anywhere; }
+.activity-record-content dd { margin: 0; min-width: 0; }
+.activity-record-content pre { margin: 0; max-height: 24rem; overflow: auto; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .workspace-technical { border-top: 1px solid #deded9; padding-top: 14px; margin-top: 24px; font-size: 12px; color: #727985; }
 .workspace-technical summary { cursor: pointer; padding-bottom: 8px; }
 .workspace-technical code { overflow-wrap: anywhere; }
@@ -138,4 +156,5 @@
   .workspace-tabs { gap: 10px; }
   .workspace-tabs > button { font-size: 12px; }
   .workspace-timeline { overflow-x: auto; }
+  .activity-record-content dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }

@@ -10,8 +10,21 @@ export function sameProjectPath(a?: string, b?: string): boolean {
   if (!a || !b) return false;
   const normalize = (value: string) => {
     const windows = /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\");
-    const path = value.replace(/[\\/]+$/, "") || "/";
-    return windows ? path.replace(/\\/g, "/").toLowerCase() : path;
+    if (!windows) return value.replace(/\/+$/, "") || "/";
+    let path = value;
+    // UI comparison only: retain the original path for all runtime operations.
+    // Runner canonical paths use extended drive/UNC syntax, unlike saved picker paths.
+    if (path.startsWith("\\\\?\\")) {
+      const rest = path.slice(4);
+      // Verbatim-only names and device namespaces must not alias ordinary paths.
+      if (!rest.includes("/") && !rest.split("\\").some(part => /[. ]$/.test(part))) {
+        if (/^[A-Za-z]:\\/.test(rest)) path = rest;
+        else if (/^UNC\\[^\\]+\\[^\\]+(?:\\|$)/i.test(rest)) path = "\\\\" + rest.slice(4);
+      }
+    }
+    const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    // A drive root is absolute; C: without a separator is drive-relative.
+    return /^[a-z]:$/.test(normalized) ? `${normalized}/` : normalized;
   };
   return normalize(a) === normalize(b);
 }

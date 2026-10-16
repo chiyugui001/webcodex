@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ActivityEntry } from "../../models/topology";
 import { useLocale } from "../../i18n/locale";
 import { activityMessage, activitySource } from "../../i18n/presentation";
+import { ActivityRecord } from "./ActivityRecord";
 
 export function SystemActivity({ activity }: { activity: ActivityEntry[] }) {
   const { t, formatTime } = useLocale();
@@ -11,7 +12,7 @@ export function SystemActivity({ activity }: { activity: ActivityEntry[] }) {
   const visible = [...activity].reverse().filter((entry) => {
     if (!showProcesses && entry.level === "info" && entry.event_kind.startsWith("process_")) return false;
     if (problemsOnly && entry.level !== "error" && entry.level !== "warning") return false;
-    return `${activityMessage(entry, t)} ${activitySource(entry.source, t)}`
+    return `${activityMessage(entry, t)} ${activitySource(entry.source, t)} ${entry.message} ${entry.source} ${entry.event_kind} ${entry.tunnel_profile_id ?? ""}`
       .toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   });
   return (
@@ -35,13 +36,13 @@ export function SystemActivity({ activity }: { activity: ActivityEntry[] }) {
         {activity.length === 0 && <div className="empty-state">{t("activity.empty")}</div>}
         {activity.length > 0 && visible.length === 0 && <div className="empty-state">{t("activity.noMatches")}</div>}
         {visible.map((entry) => (
-          <article className="activity-row" key={entry.sequence}>
+          <ActivityRecord record={entry} summaryClassName="activity-row" key={entry.sequence}>
             <i className={`status-dot ${entry.level === "error" ? "error" : entry.level === "warning" ? "pending" : "unknown"}`} aria-hidden="true" />
-            <div>
+            <span className="activity-summary-main">
               <strong>{activityMessage(entry, t)}</strong>
               <span>{activitySource(entry.source, t)} · {formatTime(entry.timestamp_ms)}</span>
-            </div>
-          </article>
+            </span>
+          </ActivityRecord>
         ))}
       </div>
     </section>

@@ -5,6 +5,7 @@ import { useLocale } from "../../i18n/locale";
 import { sessionTitle, workspaceQuery } from "../workspace/WorkspaceContext";
 import { WorkspaceDialog } from "../workspace/WorkspaceDialog";
 import { observationTime } from "../workspace/WorkspaceStatus";
+import { ActivityRecord } from "./ActivityRecord";
 
 export function activityTitle(activity: SessionActivity | undefined, p: (key: ProductKey) => string): string {
   if (!activity) return p("noActivity");
@@ -45,11 +46,11 @@ export function WorkflowSessionDetail({ project, id, onClose }: { project: strin
       <div className="session-detail-meta"><span className="workspace-badge">{sessionLifecycle(session.lifecycle, p)}</span><span>{observationTime(session.updated_at * 1000, locale)}</span></div>
       <SessionAttention session={session} />
       <section className="workspace-section"><h3>{p("task")}</h3><p>{session.overview.reported_progress?.text || activityTitle(activity[0], p)}</p></section>
-      <section className="workspace-section"><h3>{p("recentActivity")}</h3><div className="workspace-timeline">{activity.slice(0, 30).map((entry, index) => <article key={`${entry.started_at}-${index}`}>
-        <div><strong>{activityTitle(entry, p)}</strong>{entry.paths && entry.paths.length > 0 && <span>{entry.paths.join(" · ")}</span>}</div>
+      <section className="workspace-section"><h3>{p("recentActivity")}</h3><div className="workspace-timeline">{activity.slice(0, 30).map((entry, index) => <ActivityRecord record={entry} summaryClassName="workspace-timeline-row" key={`${entry.started_at}-${index}`}>
+        <span className="activity-summary-main"><strong>{activityTitle(entry, p)}</strong>{entry.paths && entry.paths.length > 0 && <span>{entry.paths.join(" · ")}</span>}</span>
         <span className="activity-outcome">{entry.state === "running" ? p("inProgress") : entry.state === "failed" ? p("failed") : entry.state === "completed" || entry.state === "succeeded" ? p("completed") : p("observed")}</span>
         <time>{observationTime(entry.finished_at ? entry.finished_at * 1000 : entry.started_at ? entry.started_at * 1000 : null, locale)}</time>
-      </article>)}</div>{session.activity_truncated && <p className="workspace-notice">{p("partial")}</p>}</section>
+      </ActivityRecord>)}</div>{session.activity_truncated && <p className="workspace-notice">{p("partial")}</p>}</section>
       <section className="workspace-section"><h3>{p("files")}</h3><p className="field-help">{p("currentGit")}</p>
         {git ? <><p>{git.branch || p(git.non_git_project ? "notGit" : "unknown")}</p>{git.files?.length ? <ul className="changed-files">{git.files.map(file => <li key={file.path}><span>{file.path}</span><small>{file.status}</small></li>)}</ul> : <p>{p(git.clean ? "clean" : git.non_git_project ? "notGit" : "unknown")}</p>}{git.files_truncated && <p>{p("partial")}</p>}</> : <p>{p("unknown")}</p>}
       </section>

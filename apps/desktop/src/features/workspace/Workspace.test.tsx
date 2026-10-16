@@ -40,8 +40,8 @@ beforeEach(() => {
       case "overview": return overview;
       case "windows": return { windows: [windowRow] };
       case "project_git": return { branch: "feat/export", clean: false, git_available: true, non_git_project: false, files: [{ path: "src/export.ts", status: " M" }] };
-      case "window": return { ...windowRow, linked_sessions: [{ project: alpha.id, workflow_session_id: session.session_id, title: session.title }], activity: [{ tool_name: "apply_text_edits", meaningful: true, project: alpha.id, status: "succeeded", ended_at_ms: 100_000 }] };
-      case "session": return { ...session, activity: [{ kind: "Edited", state: "succeeded", summary: "Updated export handler", started_at: 90, finished_at: 100 }] };
+      case "window": return { ...windowRow, linked_sessions: [{ project: alpha.id, workflow_session_id: session.session_id, title: session.title }], activity: [{ tool_name: "apply_text_edits", meaningful: true, project: alpha.id, status: "succeeded", started_at_ms: 90_000, ended_at_ms: 100_000 }] };
+      case "session": return { ...session, activity: [{ kind: "Edited", state: "succeeded", summary: "Updated export handler", tool: "apply_text_edits", paths: ["src/export.ts"], job_id: "wc_job_export_check", started_at: 90, finished_at: 100 }] };
       case "extensions": return { project: alpha.id, runner: "mini", can_reload_plugins: true,
         instructions: { files: [{ source_scope: "project", path: "AGENTS.md", fingerprint: "revision-one", total_lines: 2 }], scan_complete: true },
         skills: { available: true, catalog: { skills: [{ skill_id: "skill-1", name: "Review changes", description: "Review project changes", source_scope: "project" }] } },
@@ -56,6 +56,45 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("product workspace task flows", () => {
+  it.each([
+    ["drive", String.raw`\\?\E:\02_ts30x-v2`, String.raw`E:\02_ts30x-v2`],
+    ["UNC", String.raw`\\?\UNC\server\share\02_ts30x-v2`, String.raw`\\server\share\02_ts30x-v2`],
+  ])("merges extended Windows %s paths with saved projects and keeps the live current row", async (_kind, livePath, savedPath) => {
+    const liveProjects = [
+      { ...alpha, id: "agent:mini:webcodex", name: "webcodex", path: String.raw`\\?\F:\webcodex` },
+      { ...beta, id: "agent:mini:ts30x", name: "02_ts30x-v2", path: livePath },
+      { ...beta, id: "agent:mini:obsibian", name: "obsibian", path: String.raw`\\?\F:\obsibian` },
+    ];
+    const selected = { ...state,
+      project: { ...state.project!, path: savedPath, runtime_project_id: liveProjects[1].id },
+      saved_projects: [
+        { ...state.project!, path: String.raw`F:\webcodex`, runtime_project_id: liveProjects[0].id },
+        { ...state.project!, path: savedPath, runtime_project_id: liveProjects[1].id },
+      ],
+    };
+    const normal = native.invoke.getMockImplementation()!;
+    native.invoke.mockImplementation((name, value) => value.request.kind === "overview"
+      ? Promise.resolve({ ...overview, projects: liveProjects, visible_project_count: 3 }) : normal(name, value));
+    const open = vi.fn();
+    const view = render(wrap(<ProjectsPanel state={selected} onChooseProject={vi.fn()} onSelectProject={open} />, selected));
+    await screen.findByText("2 active sessions");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getByRole("heading", { level: 1, name: "Projects 3" })).toBeInTheDocument();
+    const current = screen.getByRole("listitem", { name: "02_ts30x-v2" });
+    expect(within(current).getByText("Current")).toBeInTheDocument();
+    expect(await within(current).findByText("feat/export")).toBeInTheDocument();
+    expect(within(current).getByText("0 active sessions")).toBeInTheDocument();
+    expect(within(current).queryByText("Not checked")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Current")).toHaveLength(1);
+    fireEvent.click(within(current).getByRole("button", { name: "Open Project 02_ts30x-v2" }));
+    expect(open).toHaveBeenCalledWith(livePath);
+    const switched = { ...selected, project: selected.saved_projects[0] };
+    view.rerender(wrap(<ProjectsPanel state={switched} onChooseProject={vi.fn()} onSelectProject={open} />, switched));
+    await screen.findByText("2 active sessions");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(within(screen.getByRole("listitem", { name: "webcodex" })).getByText("Current")).toBeInTheDocument();
+    expect(screen.getAllByText("Current")).toHaveLength(1);
+  });
   it("shows every project with branch/activity and keeps other projects when switching current", async () => {
     const open = vi.fn(); const add = vi.fn();
     const view = render(wrap(<ProjectsPanel state={state} onChooseProject={add} onSelectProject={open} />));
@@ -79,13 +118,45 @@ describe("product workspace task flows", () => {
     const workflow = await screen.findByRole("dialog", { name: "Fix export workflow" });
     await within(workflow).findByText("Review the export changes");
     expect(within(workflow).getByText("Updated export handler")).toBeInTheDocument();
-    expect(within(workflow).getByText("src/export.ts")).toBeInTheDocument();
+    expect(within(workflow).getByText("src/export.ts", { selector: ".changed-files span" })).toBeInTheDocument();
     expect(workflow).not.toHaveTextContent("apply_text_edits");
     expect(native.invoke).toHaveBeenCalledWith("workspace_query", { request: { kind: "session", project: alpha.id, session_id: session.session_id } });
     fireEvent.click(within(workflow).getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("tab", { name: "Workflow Sessions" }));
     expect(await screen.findByRole("button", { name: /Fix export workflow/ })).toHaveTextContent("Active jobs 1");
     expect(screen.getByRole("tab", { name: "System" })).toHaveAttribute("aria-selected", "false");
+  });
+  it("expands a Window activity into recorded tool details without another request", async () => {
+    render(wrap(<ActivityPanel activity={[]} />));
+    fireEvent.click(await screen.findByRole("button", { name: /Windows · window-001/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Windows · window-001" });
+    const label = await within(dialog).findByText("Editing files");
+    const summary = label.closest("summary")!;
+    const record = summary.parentElement!;
+    expect(record.querySelector("dl")).toBeNull();
+    const requests = native.invoke.mock.calls.length;
+    fireEvent.click(summary);
+    expect(await within(record).findByText("apply_text_edits", { selector: "pre" })).toBeVisible();
+    expect(within(record).getByText(alpha.id, { selector: "pre" })).toBeVisible();
+    expect(within(record).getByText("90000", { selector: "pre" })).toBeVisible();
+    expect(native.invoke).toHaveBeenCalledTimes(requests);
+    fireEvent.click(summary);
+    await waitFor(() => expect(record.querySelector("dl")).toBeNull());
+  });
+  it("expands Workflow Session activity into its recorded paths, tool and job", async () => {
+    render(wrap(<ActivityPanel activity={[]} />));
+    fireEvent.click(screen.getByRole("tab", { name: "Workflow Sessions" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Fix export workflow/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Fix export workflow" });
+    const label = await within(dialog).findByText("Updated export handler");
+    const summary = label.closest("summary")!;
+    const record = summary.parentElement!;
+    expect(record.querySelector("dl")).toBeNull();
+    fireEvent.click(summary);
+    expect(await within(record).findByText("apply_text_edits", { selector: "pre" })).toBeVisible();
+    expect(within(record).getByText("wc_job_export_check", { selector: "pre" })).toBeVisible();
+    expect(within(record).getByText(/src\/export.ts/, { selector: "pre" })).toHaveTextContent('"src/export.ts"');
+    expect(within(record).getByText("100", { selector: "pre" })).toBeVisible();
   });
   it("opens effective instructions, lists real Skills and reloads a provider only on request", async () => {
     render(wrap(<ExtensionsPanel state={state} onState={vi.fn()} />));
@@ -127,6 +198,34 @@ describe("product workspace task flows", () => {
 });
 
 describe("cross-platform product vocabulary", () => {
+  it.each([
+    [String.raw`\\?\E:\02_ts30x-v2`, String.raw`E:\02_ts30x-v2`],
+    [String.raw`\\?\F:\WebCodex`, "f:/webcodex/"],
+    [String.raw`\\?\UNC\SERVER\Share\Repo`, String.raw`\\server\share\repo`],
+    [String.raw`\\?\UNC\SERVER\Share`, String.raw`\\server\share`],
+    ["\\\\?\\C:\\", "c:/"],
+  ])("matches extended Windows paths %s and %s in either direction", (a, b) => {
+    expect(sameProjectPath(a, b)).toBe(true);
+    expect(sameProjectPath(b, a)).toBe(true);
+  });
+  it.each([
+    [String.raw`\\?\E:\repo`, String.raw`F:\repo`],
+    [String.raw`\\?\UNC\server\share\repo`, String.raw`\\other\share\repo`],
+    [String.raw`\\?\UNC\server\share\repo`, String.raw`\\server\other\repo`],
+    [String.raw`\\?\Volume{fixture}\repo`, String.raw`Volume{fixture}\repo`],
+    [String.raw`\\.\C:\repo`, String.raw`C:\repo`],
+    [String.raw`\\?\C:repo`, "C:repo"],
+    [String.raw`\\?\C:\repo.`, String.raw`C:\repo.`],
+    ["\\\\?\\C:\\repo ", "C:\\repo "],
+    [String.raw`\\?\C:\parent\..\repo`, String.raw`C:\parent\..\repo`],
+    [String.raw`\\?\C:\repo/child`, String.raw`C:\repo/child`],
+    ["c:/", "c:"],
+    ["/work/Repo", "/work/repo"],
+    ["/work/repo\\", "/work/repo"],
+  ])("keeps distinct Windows namespaces or literal paths separate: %s and %s", (a, b) => {
+    expect(sameProjectPath(a, b)).toBe(false);
+    expect(sameProjectPath(b, a)).toBe(false);
+  });
   it("matches Windows drive and UNC paths without collapsing Unix case or root", () => {
     expect(sameProjectPath("C:\\Work\\Repo\\", "c:/work/repo")).toBe(true);
     expect(sameProjectPath("\\\\SERVER\\Share\\Repo", "\\\\server\\share\\repo\\")).toBe(true);

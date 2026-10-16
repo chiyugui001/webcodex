@@ -297,8 +297,9 @@ beforeEach(() => {
     expect(screen.queryByText("已切换到 sample-project")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "系统" }));
     await screen.findByText("已切换到 sample-project");
-    expect(screen.getAllByRole("article")).toHaveLength(2);
-    expect(screen.getAllByRole("article")[0]).toHaveTextContent("已切换到 sample-project");
+    const activities = within(screen.getByRole("tabpanel"));
+    expect(activities.getAllByRole("group")).toHaveLength(2);
+    expect(activities.getAllByRole("group")[0]).toHaveTextContent("已切换到 sample-project");
   });
 
   it("starts the named profile only after explicit action and permits retry", async () => {
@@ -392,19 +393,20 @@ beforeEach(() => {
     fireEvent.keyDown(language, { key: "3", metaKey: true });
     fireEvent.click(screen.getByRole("tab", { name: "系统" }));
     const search = screen.getByRole("searchbox");
-    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(1));
+    const activities = within(screen.getByRole("tabpanel"));
+    await waitFor(() => expect(activities.getAllByRole("group")).toHaveLength(1));
     fireEvent.click(screen.getByRole("checkbox", { name: "显示进程详情" }));
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(activities.getAllByRole("group")).toHaveLength(2);
     fireEvent.click(screen.getByRole("checkbox", { name: "只看警告和错误" }));
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(activities.getAllByRole("group")).toHaveLength(1);
     fireEvent.change(search, { target: { value: "no matching source" } });
-    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(activities.queryByRole("group")).not.toBeInTheDocument();
     expect(screen.getByText("没有匹配的活动，请调整搜索或筛选条件。")).toBeInTheDocument();
     fireEvent.keyDown(search, { key: "a", ctrlKey: true });
     expect(screen.getByRole("searchbox")).toBeInTheDocument();
     fireEvent.change(search, { target: { value: "" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "只看警告和错误" }));
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(activities.getAllByRole("group")).toHaveLength(2);
     fireEvent.keyDown(window, { key: "2", ctrlKey: true });
     expect(screen.getByRole("button", { name: "项目" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("main")).toHaveFocus();

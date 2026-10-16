@@ -75,6 +75,7 @@ export const PRODUCT_MESSAGES = {
   questions: ["Questions", "问题", "Fragen", "Questions", "質問", "질문"],
   risks: ["Risks", "风险", "Risiken", "Risques", "リスク", "위험"],
   details: ["Details", "详情", "Details", "Détails", "詳細", "상세 정보"],
+  recordedDetailsNote: ["Recorded fields only. Content may already be redacted or truncated by the runtime.", "仅显示已记录的字段；内容可能已由运行时脱敏或截断。", "Nur aufgezeichnete Felder. Inhalte können bereits durch die Laufzeit geschwärzt oder gekürzt sein.", "Champs enregistrés uniquement. Le contenu peut déjà être masqué ou tronqué par l’environnement d’exécution.", "記録済みの項目のみを表示します。内容は実行環境によってマスクまたは切り詰められている場合があります。", "기록된 필드만 표시합니다. 내용은 실행 환경에서 이미 가려지거나 잘렸을 수 있습니다."],
   close: ["Close", "关闭", "Schließen", "Fermer", "閉じる", "닫기"],
   search: ["Search projects", "搜索项目", "Projekte suchen", "Rechercher des projets", "プロジェクトを検索", "프로젝트 검색"],
   noMatches: ["No matching projects", "没有匹配的项目", "Keine passenden Projekte", "Aucun projet correspondant", "該当するプロジェクトはありません", "일치하는 프로젝트 없음"],

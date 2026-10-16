@@ -31,6 +31,8 @@ Home prioritizes overall readiness, the next action, and your current project. C
 
 You do not need to stop the runtime or OpenAI Secure Tunnel before changing projects. Desktop adds the selected exact project root to the Runner policy, hot-activates it on a compatible Runner, persists the current selection, and keeps the existing Service and Tunnel. Only a legacy or incompatible Runner may need its Desktop-owned Runner process refreshed. Do not broaden allowed directories to work around a project loading failure.
 
+On Windows, the project list merges ordinary saved drive/UNC paths with the Runner's equivalent extended (`\\?\`) paths. The live project retains its status and current-project marker instead of appearing twice. This is a display comparison only; it does not rewrite project paths, change permissions, or merge distinct drives/shares and verbatim-only names.
+
 ## Connections and recovery
 
 Connection keeps **Tunnel connection settings** visible near the top. The ID and write-only API key remain editable with the regular Tunnel running or stopped. Save persists the configuration and replaces only an active Desktop-owned regular Tunnel; Server and Runner keep running. A stopped Tunnel stays stopped until explicitly started. Blank API key retains the saved key. Saved keys are never returned to the UI.
@@ -66,7 +68,9 @@ Desktop's own permission results do not prove that a separately launched Runner 
 
 ## Activity, settings, and background operation
 
-**Activity** shows newest entries first. Search content or sources, or select **Warnings and errors only**. Filtering never deletes records.
+**Activity** keeps entries compact by default. Click an activity row or its **Details** label to expand the recorded fields; click again to collapse. This works for System events and individual activities inside Windows and Workflow Sessions. Details preserve multiline messages, complete recorded paths, tool names, status, and timestamps when present, without additional UI truncation. Use Tab and Enter or Space to operate the disclosure.
+
+**System** shows newest entries first. Search also matches the recorded message, event kind, source, and tunnel profile ID, not just the translated summary. **Warnings and errors only** and **Show process details** retain their existing behavior; filtering never deletes records. Details show only data already returned by the runtime, not raw terminal output or complete tool request/response payloads. Existing redaction, history bounds, and backend truncation still apply; System messages remain bounded to 1,024 bytes before the truncation marker.
 
 **Settings** contains language, launch at login, Computer Use permissions on macOS, Tunnel networking, and diagnostics. You can also switch language at the bottom of the sidebar. Supported languages are 简体中文, English, 日本語, 한국어, Deutsch, and Français. The selection is remembered across restarts, and activity times follow the selected locale. System tray menus and raw backend diagnostics remain in English; the operating system controls native file-picker language.
 

@@ -5,6 +5,7 @@ import { useProduct, type ProductKey } from "../../i18n/product";
 import { projectName, useWorkspace, workspaceQuery } from "../workspace/WorkspaceContext";
 import { WorkspaceDialog } from "../workspace/WorkspaceDialog";
 import { observationTime } from "../workspace/WorkspaceStatus";
+import { ActivityRecord } from "./ActivityRecord";
 
 function windowAction(tool: string | undefined, p: (key: ProductKey) => string): string {
   if (!tool) return p("activity");
@@ -40,11 +41,11 @@ export function WindowActivityDetail({ id, onClose }: { id: string; onClose: () 
         {detail.sessions_truncated && <p className="workspace-notice">{p("partial")}</p>}
       </section>
       <section className="workspace-section"><h3>{p("recentActivity")}</h3><div className="workspace-timeline">
-        {detail.activity.filter(row => row.meaningful !== false).map((row, index) => <article key={`${row.started_at_ms}-${index}`}>
-          <div><strong>{windowAction(row.tool_name, p)}</strong><span>{name(row.project)}</span></div>
+        {detail.activity.filter(row => row.meaningful !== false).map((row, index) => <ActivityRecord record={row} summaryClassName="workspace-timeline-row" key={`${row.started_at_ms}-${index}`}>
+          <span className="activity-summary-main"><strong>{windowAction(row.tool_name, p)}</strong><span>{name(row.project)}</span></span>
           <span className="activity-outcome">{p(row.status === "failed" || row.status === "error" ? "failed" : "observed")}</span>
           <time>{observationTime(row.ended_at_ms || row.started_at_ms, locale)}</time>
-        </article>)}
+        </ActivityRecord>)}
       </div>{detail.activity_truncated && <p className="workspace-notice">{p("partial")}</p>}</section>
       <details className="workspace-technical"><summary>{p("details")}</summary><code>{id}</code></details>
     </>}
